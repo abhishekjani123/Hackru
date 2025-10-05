@@ -1,0 +1,19 @@
+{
+  "name": "vendor-purchasing-management",
+  "version": "1.0.0",
+  "description": "AI-powered vendor purchasing management system for shop owners",
+  "main": "backend/server.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\" \"npm run ai-service\"",
+    "server": "cd backend && nodemon server.js",
+    "client": "cd frontend && npm start",
+    "ai-service": "cd ai-service && python app.py",
+    "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ../ai-service && pip install -r requirements.txt"
+  },
+  "keywords": ["vendor", "purchasing", "inventory", "AI", "MERN"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
