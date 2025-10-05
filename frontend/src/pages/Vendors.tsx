@@ -148,16 +148,16 @@ const Vendors: React.FC = () => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <div>
           <Typography variant="h4" fontWeight={700} gutterBottom>
-            Vendor Management
+            Vendor Management (Optional)
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Manage your suppliers and compare their offerings
+            AI auto-discovers vendors for you! This page is for saving favorites or manual tracking.
           </Typography>
         </div>
         <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button 
-            variant="outlined" 
-            startIcon={<TravelExplore />} 
+          <Button
+            variant="outlined"
+            startIcon={<TravelExplore />}
             onClick={handleOpenSearch}
             sx={{
               background: 'linear-gradient(45deg, #6366f1 30%, #8b5cf6 90%)',
@@ -172,10 +172,24 @@ const Vendors: React.FC = () => {
             Search Online Vendors
           </Button>
           <Button variant="contained" startIcon={<Add />} onClick={() => handleOpen()}>
-            Add Vendor
+            Add Favorite Vendor
           </Button>
         </Box>
       </Box>
+
+      {/* AI Auto-Discovery Notice */}
+      <Alert severity="info" sx={{ mb: 3 }} icon={<TravelExplore />}>
+        <Typography variant="body2" fontWeight={600} gutterBottom>
+          🤖 AI Handles Vendor Discovery Automatically!
+        </Typography>
+        <Typography variant="body2">
+          When you use <strong>AI Insights</strong>, the system automatically searches online marketplaces (Alibaba, Amazon Business, IndiaMART, etc.) 
+          and finds the best vendors for each product. <strong>No manual vendor management required!</strong>
+        </Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+          💡 This page is optional - use it only if you want to save favorite vendors or track specific suppliers manually.
+        </Typography>
+      </Alert>
 
       <Grid container spacing={3}>
         {vendors.map((vendor) => (

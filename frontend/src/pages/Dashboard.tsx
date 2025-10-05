@@ -346,14 +346,6 @@ const Dashboard: React.FC = () => {
                   No vendors yet. Add vendors to get started!
                 </Typography>
               )}
-              <Button
-                fullWidth
-                variant="outlined"
-                sx={{ mt: 2 }}
-                onClick={() => navigate('/vendors')}
-              >
-                View All Vendors
-              </Button>
             </CardContent>
           </Card>
         </Grid>
@@ -366,47 +358,37 @@ const Dashboard: React.FC = () => {
             🚀 Quick Actions
           </Typography>
           <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={6} md={4}>
               <Button
                 fullWidth
                 variant="contained"
-                onClick={() => navigate('/inventory')}
+                onClick={() => navigate('/app/inventory')}
                 sx={{ py: 1.5 }}
               >
                 Add Inventory Item
               </Button>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Button
-                fullWidth
-                variant="contained"
-                color="secondary"
-                onClick={() => navigate('/vendors')}
-                sx={{ py: 1.5 }}
-              >
-                Add New Vendor
-              </Button>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={6} md={4}>
               <Button
                 fullWidth
                 variant="contained"
                 color="success"
-                onClick={() => navigate('/purchase-orders')}
+                onClick={() => navigate('/app/purchase-orders')}
                 sx={{ py: 1.5 }}
               >
-                Create Order
+                View Purchase Orders
               </Button>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={6} md={4}>
               <Button
                 fullWidth
-                variant="outlined"
+                variant="contained"
+                color="secondary"
                 startIcon={<AutoAwesome />}
-                onClick={() => navigate('/ai-insights')}
+                onClick={() => navigate('/app/ai-insights')}
                 sx={{ py: 1.5 }}
               >
-                AI Insights
+                AI Vendor Discovery
               </Button>
             </Grid>
           </Grid>

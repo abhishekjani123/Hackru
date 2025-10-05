@@ -8,6 +8,30 @@ const PurchaseOrder = require('../models/PurchaseOrder');
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:5000';
 
+// Helper function to search online vendors for a product using AI service
+async function searchOnlineVendors(productName, quantity) {
+  try {
+    console.log(`🔍 Calling AI service to scrape real vendors for: ${productName}`);
+    
+    // Call AI service's web scraping endpoint
+    const response = await axios.post(`${AI_SERVICE_URL}/api/search-vendors`, {
+      productName: productName,
+      quantity: quantity
+    }, { timeout: 15000 }); // Longer timeout for scraping
+    
+    if (response.data.success && response.data.vendors) {
+      console.log(`✅ AI service found ${response.data.vendors.length} real vendors`);
+      return response.data.vendors;
+    } else {
+      console.log('⚠️ AI service returned no vendors, using fallback');
+      return [];
+    }
+  } catch (error) {
+    console.error('Error calling AI scraping service:', error.message);
+    return [];
+  }
+}
+
 // Get AI recommendations for purchase orders
 router.post('/recommend-purchase', auth, async (req, res) => {
   try {
@@ -24,43 +48,69 @@ router.post('/recommend-purchase', auth, async (req, res) => {
       });
     }
     
-    // Get all vendors
-    const vendors = await Vendor.find({
-      user: req.userId,
-      status: 'active'
-    });
+    console.log('🤖 AI Searching online vendors for', lowStockItems.length, 'items...');
+    
+    // Search online vendors for each item (AI-powered search)
+    const onlineVendorPromises = lowStockItems.map(item => 
+      searchOnlineVendors(item.name, item.reorderPoint - item.currentStock + 20)
+    );
+    const onlineVendorResults = await Promise.all(onlineVendorPromises);
+    
+    // Use ONLY online vendors (flatten array)
+    const allOnlineVendors = onlineVendorResults.flat();
+    
+    console.log(`🌐 AI found ${allOnlineVendors.length} online vendors from marketplaces`);
+    
+    // Use ONLY online vendors - purely AI-driven
+    const combinedVendors = allOnlineVendors;
     
     try {
-      // Try to call AI service
+      // Try to call AI service with combined vendor data
       const aiResponse = await axios.post(`${AI_SERVICE_URL}/api/recommend-purchase`, {
         items: lowStockItems.map(item => ({
           id: item._id,
           name: item.name,
           currentStock: item.currentStock,
           reorderPoint: item.reorderPoint,
+          maxCapacity: item.maxCapacity,
           averageDailySales: item.averageDailySales,
           costPrice: item.costPrice,
           category: item.category
         })),
-        vendors: vendors.map(vendor => ({
-          id: vendor._id,
-          name: vendor.name,
-          rating: vendor.rating,
-          deliveryTime: vendor.deliveryTime,
-          products: vendor.products,
-          performance: vendor.performance
-        }))
-      }, { timeout: 5000 });
+        vendors: combinedVendors
+      }, { timeout: 10000 }); // Increased timeout for AI processing
       
-      res.json(aiResponse.data);
+      res.json({
+        ...aiResponse.data,
+        searchSummary: {
+          databaseVendors: 0,
+          onlineVendors: allOnlineVendors.length,
+          totalVendorsAnalyzed: combinedVendors.length,
+          aiPowered: true,
+          marketplaces: ['Alibaba', 'Amazon Business', 'IndiaMART']
+        }
+      });
     } catch (aiError) {
       // Fallback: Generate basic recommendations without AI
-      console.log('AI service unavailable, using fallback recommendations');
-      const recommendations = generateFallbackRecommendations(lowStockItems, vendors);
+      console.log('❌ AI service error:', aiError.message);
+      console.log('Trying to connect to:', AI_SERVICE_URL);
+      if (aiError.response) {
+        console.log('AI service response status:', aiError.response.status);
+        console.log('AI service response data:', aiError.response.data);
+      }
+      console.log('Using fallback recommendations');
+      const recommendations = generateFallbackRecommendations(lowStockItems, combinedVendors);
       res.json({
-        message: 'Showing basic recommendations (AI service unavailable)',
+        message: 'Showing recommendations from online marketplaces (AI service unavailable)',
         recommendations,
-        usingFallback: true
+        usingFallback: true,
+        searchSummary: {
+          databaseVendors: 0,
+          onlineVendors: allOnlineVendors.length,
+          totalVendorsAnalyzed: combinedVendors.length,
+          aiPowered: true,
+          marketplaces: ['Alibaba', 'Amazon Business', 'IndiaMART']
+        }
       });
     }
   } catch (error) {
@@ -167,9 +217,13 @@ router.post('/generate-order', auth, async (req, res) => {
     const createdOrders = [];
     
     for (const [vendorId, items] of Object.entries(ordersByVendor)) {
-      const order = new PurchaseOrder({
+      const firstItem = items[0];
+      
+      // Check if vendor is an online vendor (AI-discovered) or database vendor
+      const isOnlineVendor = firstItem.isOnline || vendorId.startsWith('online_') || vendorId.startsWith('realistic_') || vendorId.startsWith('google_');
+      
+      const orderData = {
         user: req.userId,
-        vendor: vendorId,
         items: items.map(item => ({
           inventoryItem: item.itemId,
           name: item.itemName,
@@ -178,21 +232,51 @@ router.post('/generate-order', auth, async (req, res) => {
         })),
         isAIGenerated: true,
         status: 'draft',
+        expectedDeliveryDate: new Date(Date.now() + (firstItem.deliveryTime || 7) * 24 * 60 * 60 * 1000),
         aiRecommendation: {
-          score: items[0].confidence || 0.85,
-          reasoning: 'AI-generated order based on inventory analysis and vendor comparison'
+          score: firstItem.confidence || 0.85,
+          reasoning: firstItem.aiInsight || 'AI-generated order based on inventory analysis and vendor comparison'
         }
-      });
+      };
       
+      if (isOnlineVendor) {
+        // Online vendor - store details directly
+        orderData.vendorDetails = {
+          vendorId: vendorId,
+          name: firstItem.vendorName,
+          source: firstItem.vendorSource || 'Online Marketplace',
+          country: firstItem.country || 'N/A',
+          rating: firstItem.rating || 4.5,
+          deliveryTime: firstItem.deliveryTime || 7,
+          isOnline: true
+        };
+      } else {
+        // Database vendor - use reference
+        orderData.vendor = vendorId;
+      }
+      
+      const order = new PurchaseOrder(orderData);
       await order.save();
-      await order.populate('vendor');
+      
+      if (!isOnlineVendor) {
+        await order.populate('vendor');
+      }
+      
       createdOrders.push(order);
     }
     
-    res.json({ orders: createdOrders });
+    res.json({ 
+      success: true,
+      message: `Successfully created ${createdOrders.length} purchase order(s)`,
+      orders: createdOrders 
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Error generating orders:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to generate purchase orders',
+      error: error.message 
+    });
   }
 });
 

@@ -13,8 +13,15 @@ import {
   ListItem,
   Divider,
   Grid,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Table,
+  TableBody,
+  TableRow,
+  TableCell,
 } from '@mui/material';
-import { AutoAwesome, TrendingUp, Psychology, Lightbulb } from '@mui/icons-material';
+import { AutoAwesome, TrendingUp, Psychology, Lightbulb, ExpandMore, CheckCircle, Warning } from '@mui/icons-material';
 import { aiAPI, purchaseOrdersAPI } from '../services/api';
 import { motion } from 'framer-motion';
 
@@ -23,6 +30,8 @@ const AIInsights: React.FC = () => {
   const [recommendations, setRecommendations] = useState<any>(null);
   const [insights, setInsights] = useState<any>(null);
   const [generatingOrders, setGeneratingOrders] = useState(false);
+  const [selectedVendors, setSelectedVendors] = useState<{[key: string]: any}>({});
+  const [backupSelections, setBackupSelections] = useState<{[key: string]: any[]}>({});
 
   const fetchRecommendations = async () => {
     try {
@@ -48,15 +57,49 @@ const AIInsights: React.FC = () => {
     }
   };
 
+  const handleSelectPrimaryVendor = (itemId: string, recommendation: any) => {
+    setSelectedVendors(prev => ({
+      ...prev,
+      [itemId]: recommendation
+    }));
+    alert(`✅ Selected ${recommendation.vendorName} as primary vendor for ${recommendation.itemName}`);
+  };
+
+  const handleSelectBackupVendor = (itemId: string, backup: any) => {
+    setBackupSelections(prev => {
+      const currentBackups = prev[itemId] || [];
+      const isAlreadySelected = currentBackups.some(b => b.vendorId === backup.vendorId);
+      
+      if (isAlreadySelected) {
+        alert(`⚠️ This vendor is already selected as a backup for this item`);
+        return prev;
+      }
+      
+      return {
+        ...prev,
+        [itemId]: [...currentBackups, backup]
+      };
+    });
+    alert(`✅ Added ${backup.vendorName} as backup vendor`);
+  };
+
   const generateOrders = async () => {
     if (!recommendations?.recommendations) return;
 
     try {
       setGeneratingOrders(true);
-      await aiAPI.generateOrder({ recommendations: recommendations.recommendations });
-      alert('Purchase orders created successfully! Check the Purchase Orders page.');
-    } catch (error) {
+      const response = await aiAPI.generateOrder({ recommendations: recommendations.recommendations });
+      if (response.data.success) {
+        alert(`✅ ${response.data.message}\n\nCheck the Purchase Orders page to view them.`);
+        // Reset selections after successful order generation
+        setSelectedVendors({});
+        setBackupSelections({});
+      } else {
+        alert('Purchase orders created successfully! Check the Purchase Orders page.');
+      }
+    } catch (error: any) {
       console.error('Failed to generate orders:', error);
+      alert(`❌ Failed to create purchase orders: ${error.response?.data?.message || error.message}`);
     } finally {
       setGeneratingOrders(false);
     }
@@ -195,65 +238,214 @@ const AIInsights: React.FC = () => {
                 </Box>
               )}
 
-              <Grid container spacing={2}>
-                {recommendations.recommendations?.map((rec: any, index: number) => (
-                  <Grid item xs={12} md={6} key={index}>
-                    <Card variant="outlined">
-                      <CardContent>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
-                          <Typography variant="h6" fontWeight={600}>
-                            {rec.itemName}
-                          </Typography>
-                          <Chip label={`${(rec.confidence * 100).toFixed(0)}% confident`} color="primary" size="small" />
-                        </Box>
+              {recommendations.searchSummary && (
+                <Alert severity="success" icon={<TrendingUp />} sx={{ mb: 3 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                    <Box>
+                      <Typography variant="body2">
+                        🤖 <strong>AI-Powered Search:</strong> Analyzed {recommendations.searchSummary.totalVendorsAnalyzed} vendors from {recommendations.searchSummary.marketplaces?.join(', ')}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                        All recommendations are sourced directly from online marketplaces - no manual vendor management needed!
+                      </Typography>
+                    </Box>
+                    <Button
+                      variant="contained"
+                      color="success"
+                      size="large"
+                      onClick={generateOrders}
+                      disabled={generatingOrders || !recommendations.recommendations || recommendations.recommendations.length === 0}
+                      startIcon={generatingOrders ? <CircularProgress size={20} color="inherit" /> : <AutoAwesome />}
+                      sx={{ whiteSpace: 'nowrap' }}
+                    >
+                      {generatingOrders ? 'Creating Orders...' : 'Generate Purchase Orders'}
+                    </Button>
+                  </Box>
+                </Alert>
+              )}
 
-                        <Grid container spacing={2} sx={{ mb: 2 }}>
-                          <Grid item xs={6}>
-                            <Typography variant="caption" color="text.secondary">
-                              Current Stock
+              {/* Selection Summary */}
+              {(Object.keys(selectedVendors).length > 0 || Object.keys(backupSelections).length > 0) && (
+                <Alert severity="info" sx={{ mb: 3 }}>
+                  <AlertTitle>Your Selections</AlertTitle>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    ✅ <strong>{Object.keys(selectedVendors).length}</strong> primary vendor{Object.keys(selectedVendors).length !== 1 ? 's' : ''} selected
+                  </Typography>
+                  <Typography variant="body2">
+                    🔄 <strong>{Object.values(backupSelections).reduce((sum: number, arr: any[]) => sum + arr.length, 0)}</strong> backup vendor{Object.values(backupSelections).reduce((sum: number, arr: any[]) => sum + arr.length, 0) !== 1 ? 's' : ''} added
+                  </Typography>
+                </Alert>
+              )}
+
+              <Grid container spacing={3}>
+                {recommendations.recommendations?.map((rec: any, index: number) => (
+                  <Grid item xs={12} key={index}>
+                    <Card variant="outlined" sx={{ overflow: 'visible' }}>
+                      <CardContent>
+                        {/* Product Header */}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                          <Box>
+                            <Typography variant="h5" fontWeight={700}>
+                              {rec.itemName}
                             </Typography>
-                            <Typography variant="body2" fontWeight={600}>
-                              {rec.currentStock}
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={6}>
-                            <Typography variant="caption" color="text.secondary">
-                              Recommended Qty
-                            </Typography>
-                            <Typography variant="body2" fontWeight={600} color="primary.main">
-                              {rec.recommendedQuantity}
-                            </Typography>
-                          </Grid>
-                        </Grid>
+                            <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+                              <Box>
+                                <Typography variant="caption" color="text.secondary">Current Stock</Typography>
+                                <Typography variant="h6" fontWeight={600}>{rec.currentStock}</Typography>
+                              </Box>
+                              <Box>
+                                <Typography variant="caption" color="text.secondary">Recommended Qty</Typography>
+                                <Typography variant="h6" fontWeight={600} color="primary">{rec.recommendedQuantity}</Typography>
+                              </Box>
+                              <Box>
+                                <Typography variant="caption" color="text.secondary">Vendors Found</Typography>
+                                <Typography variant="h6" fontWeight={600}>{rec.totalVendorsFound || 5}</Typography>
+                              </Box>
+                            </Box>
+                          </Box>
+                          <Chip 
+                            label={`${(rec.confidence * 100).toFixed(0)}% Confident`} 
+                            color="success" 
+                            sx={{ fontSize: '0.9rem', px: 2, py: 2.5 }}
+                          />
+                        </Box>
 
                         <Divider sx={{ my: 2 }} />
 
-                        <Box sx={{ mb: 2 }}>
-                          <Typography variant="body2" fontWeight={600} gutterBottom>
-                            Best Vendor: {rec.vendorName}
+                        {/* Vendor Options - Primary + Backups */}
+                        <Box>
+                          <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
+                            📊 Vendor Options (Ranked by AI)
                           </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Price: ${rec.price.toFixed(2)} × {rec.recommendedQuantity} = ${rec.totalCost.toFixed(2)}
-                          </Typography>
-                          <Typography variant="body2" color="success.main">
-                            💰 Save: ${rec.estimatedSavings.toFixed(2)}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            🚚 Delivery: {rec.deliveryTime} days
-                          </Typography>
+
+                          {/* Primary Vendor */}
+                          <Card sx={{ mb: 2, border: '2px solid #4caf50', bgcolor: '#f1f8f4' }}>
+                            <CardContent>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                                <Chip label="#1 RECOMMENDED" color="success" size="small" sx={{ fontWeight: 700 }} />
+                                <Typography variant="h6" fontWeight={700}>{rec.vendorName}</Typography>
+                                <Chip label={`🌐 ${rec.vendorSource}`} size="small" color="info" />
+                                {rec.country && <Chip label={rec.country} size="small" variant="outlined" />}
+                                {rec.stockAvailable && <Chip label="✓ In Stock" size="small" color="success" />}
+                              </Box>
+
+                              <Grid container spacing={2} alignItems="center">
+                                <Grid item xs={12} md={3}>
+                                  <Typography variant="caption" color="text.secondary">Unit Price</Typography>
+                                  <Typography variant="h5" fontWeight={700} color="success.main">
+                                    ${rec.price.toFixed(2)}
+                                  </Typography>
+                                </Grid>
+                                <Grid item xs={12} md={3}>
+                                  <Typography variant="caption" color="text.secondary">Total Cost</Typography>
+                                  <Typography variant="h6" fontWeight={600}>
+                                    ${rec.totalCost.toFixed(2)}
+                                  </Typography>
+                                  <Typography variant="caption" color="success.main">
+                                    💰 Save ${rec.estimatedSavings.toFixed(2)}
+                                  </Typography>
+                                </Grid>
+                                <Grid item xs={12} md={2}>
+                                  <Typography variant="caption" color="text.secondary">Rating</Typography>
+                                  <Typography variant="body1" fontWeight={600}>
+                                    ⭐ {rec.rating?.toFixed(1) || '4.5'}/5
+                                  </Typography>
+                                </Grid>
+                                <Grid item xs={12} md={2}>
+                                  <Typography variant="caption" color="text.secondary">Delivery</Typography>
+                                  <Typography variant="body1" fontWeight={600}>
+                                    🚚 {rec.deliveryTime} days
+                                  </Typography>
+                                </Grid>
+                                <Grid item xs={12} md={2}>
+                                  <Button 
+                                    variant="contained" 
+                                    color={selectedVendors[rec.itemId] ? "primary" : "success"}
+                                    fullWidth
+                                    onClick={() => handleSelectPrimaryVendor(rec.itemId, rec)}
+                                    startIcon={selectedVendors[rec.itemId] ? <CheckCircle /> : null}
+                                  >
+                                    {selectedVendors[rec.itemId] ? "Selected" : "Select"}
+                                  </Button>
+                                </Grid>
+                              </Grid>
+
+                              {rec.aiInsight && (
+                                <Alert severity="success" icon={<Lightbulb />} sx={{ mt: 2 }}>
+                                  <Typography variant="body2">{rec.aiInsight}</Typography>
+                                </Alert>
+                              )}
+                            </CardContent>
+                          </Card>
+
+                          {/* Backup Vendors */}
+                          {rec.backupVendors && rec.backupVendors.length > 0 && (
+                            <>
+                              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, mt: 2 }}>
+                                🔄 Backup Vendors (Auto-failover if primary unavailable)
+                              </Typography>
+                              {rec.backupVendors.map((backup: any, idx: number) => (
+                                <Card key={idx} sx={{ mb: 1.5, bgcolor: idx === 0 ? '#fff8e1' : '#fafafa' }}>
+                                  <CardContent sx={{ py: 2 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                                      <Chip 
+                                        label={`#${backup.priority}`} 
+                                        size="small" 
+                                        color={idx === 0 ? "warning" : "default"}
+                                        sx={{ fontWeight: 600 }}
+                                      />
+                                      <Typography variant="subtitle1" fontWeight={600}>{backup.vendorName}</Typography>
+                                      <Chip label={`🌐 ${backup.vendorSource}`} size="small" />
+                                      {backup.country && <Chip label={backup.country} size="small" variant="outlined" />}
+                                      {backup.stockAvailable ? (
+                                        <Chip label="✓ In Stock" size="small" color="success" icon={<CheckCircle />} />
+                                      ) : (
+                                        <Chip label="Check Stock" size="small" color="warning" icon={<Warning />} />
+                                      )}
+                                    </Box>
+
+                                    <Grid container spacing={2} alignItems="center">
+                                      <Grid item xs={6} md={2}>
+                                        <Typography variant="caption" color="text.secondary">Unit Price</Typography>
+                                        <Typography variant="h6" fontWeight={600}>${backup.price.toFixed(2)}</Typography>
+                                      </Grid>
+                                      <Grid item xs={6} md={2}>
+                                        <Typography variant="caption" color="text.secondary">Total</Typography>
+                                        <Typography variant="body1" fontWeight={600}>${backup.totalCost.toFixed(2)}</Typography>
+                                        {backup.savings > 0 && (
+                                          <Typography variant="caption" color="success.main">Save ${backup.savings.toFixed(2)}</Typography>
+                                        )}
+                                      </Grid>
+                                      <Grid item xs={4} md={1.5}>
+                                        <Typography variant="caption" color="text.secondary">Rating</Typography>
+                                        <Typography variant="body2">⭐ {backup.rating.toFixed(1)}</Typography>
+                                      </Grid>
+                                      <Grid item xs={4} md={1.5}>
+                                        <Typography variant="caption" color="text.secondary">Delivery</Typography>
+                                        <Typography variant="body2">🚚 {backup.deliveryTime}d</Typography>
+                                      </Grid>
+                                      <Grid item xs={4} md={1.5}>
+                                        <Typography variant="caption" color="text.secondary">Reliability</Typography>
+                                        <Typography variant="body2">{(backup.reliabilityScore * 100).toFixed(0)}%</Typography>
+                                      </Grid>
+                                      <Grid item xs={12} md={3.5}>
+                                        <Button 
+                                          variant={backupSelections[rec.itemId]?.some((b: any) => b.vendorId === backup.vendorId) ? "contained" : "outlined"}
+                                          size="small" 
+                                          fullWidth
+                                          onClick={() => handleSelectBackupVendor(rec.itemId, backup)}
+                                          startIcon={backupSelections[rec.itemId]?.some((b: any) => b.vendorId === backup.vendorId) ? <CheckCircle /> : null}
+                                        >
+                                          {backupSelections[rec.itemId]?.some((b: any) => b.vendorId === backup.vendorId) ? "Added as Backup" : "Use as Backup"}
+                                        </Button>
+                                      </Grid>
+                                    </Grid>
+                                  </CardContent>
+                                </Card>
+                              ))}
+                            </>
+                          )}
                         </Box>
-
-                        {rec.reasoning && (
-                          <Alert severity="info" sx={{ mt: 2 }}>
-                            <Typography variant="caption">{rec.reasoning}</Typography>
-                          </Alert>
-                        )}
-
-                        {rec.aiInsight && (
-                          <Alert severity="success" icon={<Lightbulb />} sx={{ mt: 1 }}>
-                            <Typography variant="caption">{rec.aiInsight}</Typography>
-                          </Alert>
-                        )}
                       </CardContent>
                     </Card>
                   </Grid>

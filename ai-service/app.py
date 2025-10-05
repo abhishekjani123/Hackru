@@ -5,6 +5,7 @@ import os
 from services.recommendation_engine import RecommendationEngine
 from services.inventory_analyzer import InventoryAnalyzer
 from services.vendor_analyzer import VendorAnalyzer
+from services.vendor_scraper import VendorScraper
 
 load_dotenv()
 
@@ -15,6 +16,7 @@ CORS(app)
 recommendation_engine = RecommendationEngine()
 inventory_analyzer = InventoryAnalyzer()
 vendor_analyzer = VendorAnalyzer()
+vendor_scraper = VendorScraper()
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -145,6 +147,38 @@ def optimize_pricing():
         })
     except Exception as e:
         print(f"Error in optimize_pricing: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/search-vendors', methods=['POST'])
+def search_vendors():
+    """
+    Search real vendors from online marketplaces using web scraping
+    """
+    try:
+        data = request.json
+        product_name = data.get('productName', '')
+        quantity = data.get('quantity', 10)
+        
+        if not product_name:
+            return jsonify({
+                'success': False,
+                'error': 'Product name is required'
+            }), 400
+        
+        print(f"🔍 Scraping real vendors for: {product_name}")
+        vendors = vendor_scraper.search_vendors(product_name, quantity)
+        print(f"✅ Found {len(vendors)} real vendors")
+        
+        return jsonify({
+            'success': True,
+            'vendors': vendors,
+            'count': len(vendors)
+        })
+    except Exception as e:
+        print(f"Error in search_vendors: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)

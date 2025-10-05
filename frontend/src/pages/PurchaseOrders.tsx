@@ -206,7 +206,31 @@ const PurchaseOrders: React.FC = () => {
                         {order.orderNumber}
                       </Typography>
                     </TableCell>
-                    <TableCell>{order.vendor?.name || 'N/A'}</TableCell>
+                    <TableCell>
+                      <Box>
+                        <Typography variant="body2" fontWeight={600}>
+                          {order.vendorDetails?.name || order.vendor?.name || 'N/A'}
+                        </Typography>
+                        {order.vendorDetails && (
+                          <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
+                            <Chip 
+                              label={`🌐 ${order.vendorDetails.source}`} 
+                              size="small" 
+                              color="info"
+                              sx={{ fontSize: '0.65rem' }}
+                            />
+                            {order.vendorDetails.country && (
+                              <Chip 
+                                label={order.vendorDetails.country} 
+                                size="small" 
+                                variant="outlined"
+                                sx={{ fontSize: '0.65rem' }}
+                              />
+                            )}
+                          </Box>
+                        )}
+                      </Box>
+                    </TableCell>
                     <TableCell>
                       {format(new Date(order.createdAt), 'MMM dd, yyyy')}
                     </TableCell>
@@ -362,7 +386,15 @@ const PurchaseOrders: React.FC = () => {
                 {selectedOrder.orderNumber}
               </Typography>
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                Vendor: {selectedOrder.vendor?.name}
+                Vendor: {selectedOrder.vendorDetails?.name || selectedOrder.vendor?.name || 'N/A'}
+                {selectedOrder.vendorDetails && (
+                  <Chip 
+                    label={`🌐 ${selectedOrder.vendorDetails.source} (${selectedOrder.vendorDetails.country})`} 
+                    size="small" 
+                    color="info"
+                    sx={{ ml: 1, fontSize: '0.7rem' }}
+                  />
+                )}
               </Typography>
               <Typography variant="body2" color="text.secondary" gutterBottom>
                 Status: {getStatusChip(selectedOrder.status)}

@@ -56,7 +56,7 @@ const Register: React.FC = () => {
     try {
       const { confirmPassword, ...registerData } = formData;
       await register(registerData);
-      navigate('/dashboard');
+      navigate('/app/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.');
     }

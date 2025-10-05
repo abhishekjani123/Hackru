@@ -4,11 +4,12 @@ import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Pages
+import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
-import Vendors from './pages/Vendors';
+// import Vendors from './pages/Vendors'; // Removed - AI auto-discovers vendors
 import PurchaseOrders from './pages/PurchaseOrders';
 import AIInsights from './pages/AIInsights';
 import Layout from './components/Layout';
@@ -107,18 +108,19 @@ function App() {
       <AuthProvider>
         <Router>
           <Routes>
+            <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route
-              path="/*"
+              path="/app/*"
               element={
                 <PrivateRoute>
                   <Layout>
                     <Routes>
-                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/" element={<Navigate to="/app/dashboard" replace />} />
                       <Route path="/dashboard" element={<Dashboard />} />
                       <Route path="/inventory" element={<Inventory />} />
-                      <Route path="/vendors" element={<Vendors />} />
+                      {/* <Route path="/vendors" element={<Vendors />} /> */}
                       <Route path="/purchase-orders" element={<PurchaseOrders />} />
                       <Route path="/ai-insights" element={<AIInsights />} />
                     </Routes>
